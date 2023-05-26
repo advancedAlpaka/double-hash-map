@@ -9,8 +9,14 @@ import Data.Maybe (fromJust, isJust, isNothing)
 import Data.Ratio (Ratio, (%))
 import qualified Data.Vector as V
 import GHC.Stack (HasCallStack)
+import Data.List (intercalate)
 
 data HashMap k v = HashMap [Int] [Int] [Int] Int (V.Vector (Maybe (Maybe (k, v))))
+
+pr :: (Show k, Show v) => HashMap k v -> String
+pr (HashMap v1 v2 v3 s cur) = intercalate "\n" [
+    show v1, show v2, show $ take 3 v3, show s, show cur
+  ]  
 
 primes =
   2
@@ -70,14 +76,14 @@ resize toHigh m@(HashMap lePr grPr nxtPr size v) =
             then
               ( case grPr of
                   [] ->
-                    let (newSz, newPr) = findCap nxtPr
-                     in HashMap (size : lePr) grPr newPr newSz v
-                  (x : xs) -> HashMap (size : lePr) xs nxtPr x v
+                    let (newCap, newPr) = findCap nxtPr
+                     in HashMap (V.length v : lePr) grPr newPr size $ V.replicate newCap Nothing
+                  (x : xs) -> HashMap (V.length v : lePr) xs nxtPr size $ V.replicate x Nothing
               )
             else
               ( case lePr of
                   []       -> undefined
-                  (x : xs) -> HashMap xs (size : grPr) nxtPr x v
+                  (x : xs) -> HashMap xs (V.length v : grPr) nxtPr size $ V.replicate x Nothing
               )
         )
         v

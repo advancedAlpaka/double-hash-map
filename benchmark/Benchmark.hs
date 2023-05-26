@@ -25,7 +25,7 @@ type K = V.Vector A.Key
 numbers :: IO (V, V, V)
 numbers = do
   gen <- createSystemRandom
-  random <- uniformVector gen 40000
+  random <- uniformVector gen 4
   let sorted    = G.modify I.sort random
       revsorted = G.reverse sorted
   return (random, sorted, revsorted)
@@ -33,7 +33,7 @@ numbers = do
 strings :: IO (B, B, B)
 strings = do
   gen <- createSystemRandom
-  random <- V.replicateM 10000 $
+  random <- V.replicateM 100 $
       (pack . U.toList) `fmap` (uniformVector gen =<< uniformR (1,16) gen)
   let sorted    = G.modify I.sort random
       revsorted = G.reverse sorted
@@ -42,7 +42,7 @@ strings = do
 keys :: IO (K, K, K)
 keys = do
   gen <- createSystemRandom
-  random <- V.replicateM 10000 $
+  random <- V.replicateM 100 $
       (K.fromString . U.toList) `fmap` (uniformVector gen =<< uniformR (1,16) gen)
   let sorted    = G.modify I.sort random
       revsorted = G.reverse sorted
@@ -71,6 +71,8 @@ oldstricthashmap = G.foldl' (\m k -> HS.insert k value m) HS.empty
 
 instance DoubleHashable ByteString
 instance DoubleHashable A.Key
+
+
 
 main :: IO ()
 main =  defaultMain [
@@ -101,11 +103,6 @@ main =  defaultMain [
            , bench "random"    $ whnf oldstricthashmap random
            , bench "revsorted" $ whnf oldstricthashmap revsorted
            ]
-        , bgroup "IntMap" [
-             bench "sorted"    $ whnf intmap sorted
-           , bench "random"    $ whnf intmap random
-           , bench "revsorted" $ whnf intmap revsorted
-           ]  
          ]
        , env strings $ \ ~(random,sorted,revsorted) ->
          bgroup "ByteString" [
