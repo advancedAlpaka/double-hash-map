@@ -1,10 +1,16 @@
+
 {-# LANGUAGE FlexibleInstances #-}
 module Data.HashMap.Internal.Class where
 import Data.Hashable (Hashable (..))
+import System.CPUTime (getCPUTime)
+import GHC.IO (unsafePerformIO)
+
+{-# NOINLINE salt #-}
+salt = fromInteger $ unsafePerformIO getCPUTime
 
 class (Hashable a) => DoubleHashable a where
     hash2 :: a -> Int
-    hash2 e = 1 + 2 * hashWithSalt 1 e
+    hash2 = hashWithSalt salt
 
 instance DoubleHashable Int
 instance DoubleHashable Char

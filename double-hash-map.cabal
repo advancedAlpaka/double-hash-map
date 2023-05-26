@@ -1,4 +1,4 @@
-cabal-version:      3.0
+cabal-version:      3.6
 name:               double-hash-map
 version:            0.1.0.0
 synopsis:           HashMap with double hashing
@@ -18,28 +18,30 @@ maintainer:         advancedAlpaka@protonmail.com
 category:           Data
 extra-source-files: CHANGELOG.md
 
+-- double-hash-map
 library
     exposed-modules:  
         Data.HashMap
-        Data.HashMap.Internal
-        Data.HashMap.Internal.Base
-        Data.HashMap.Internal.Class
-        Data.HashMap.Internal.Instance
-
+        
     -- Modules included in this library but not exported.
-    -- other-modules:
+    other-modules:
+        Data.HashMap.Internal.Base,
+        Data.HashMap.Internal.Basic,
+        Data.HashMap.Internal.Class,
+        Data.HashMap.Internal.Instance,
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
     build-depends:    
         base ^>=4.16.4.0,
         hashable,
-        vector
+        vector,
+        deepseq,
         
     hs-source-dirs:   src
     default-language: Haskell2010
 
-executable double-hash-map
+executable double-hash-map-example
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
@@ -55,8 +57,34 @@ executable double-hash-map
     default-language: Haskell2010
 
 test-suite double-hash-map-test
-    default-language: Haskell2010
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          MyLibTest.hs
-    build-depends:    base ^>=4.16.4.0
+    default-language: Haskell2010
+    build-depends:    
+        base ^>=4.16.4.0,
+        double-hash-map,
+        hashable,
+        QuickCheck
+
+benchmark bench-hash-map
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   benchmark
+    main-is:          Benchmark.hs
+    default-language: Haskell2010
+    build-depends: 
+        base,
+        double-hash-map,
+        aeson,
+        tasty, 
+        tasty-bench,
+        vector,
+        vector-algorithms,
+        bytestring,
+        mwc-random,
+        containers,
+        unordered-containers,
+        hashable,
+    ghc-options:   "-with-rtsopts=-A32m"
+    mixins:         
+        --unordered-containers (Data.HashMap.Strict as HashMapStrict, Data.HashMap.Lazy as HashMapLazy),
