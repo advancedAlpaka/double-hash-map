@@ -2,38 +2,82 @@
 
 module Data.HashMap.Internal.Basic where
 
-import qualified Data.HashMap as H
-import Data.Maybe (fromMaybe)
-import GHC.Stack (HasCallStack)
-import Data.HashMap.Internal.Instance
 import qualified Data.HashMap.Internal.Base as HB
-import qualified Data.Vector as V
+import qualified Data.HashMap.Internal.Class as HC
 import Data.List (sortBy)
+import Data.Maybe (fromMaybe)
+import qualified Data.Vector as V
+import GHC.Stack (HasCallStack)
+import Data.HashMap.Internal.Base (defH)
+import Data.Bifunctor (second)
 
-(!?) :: (H.DoubleHashable k) => H.HashMap k v -> k -> Maybe v
-(!?) m k = H.lookup k m
+(!?) :: (HC.DoubleHashable k) => HB.HashMap k v -> k -> Maybe v
+(!?) m k = HB.lookup k m
 
-findWithDefault :: (H.DoubleHashable k)
+findWithDefault :: (HC.DoubleHashable k)
               => v          -- ^ Default value to return.
-              -> k -> H.HashMap k v -> v
-findWithDefault def k m = fromMaybe def (H.lookup k m)
+              -> k -> HB.HashMap k v -> v
+findWithDefault def k m = fromMaybe def (HB.lookup k m)
 
-(!) :: (H.DoubleHashable k, HasCallStack) => H.HashMap k v -> k -> v
-(!) m k = case H.lookup k m of
+(!) :: (HC.DoubleHashable k, HasCallStack) => HB.HashMap k v -> k -> v
+(!) m k = case HB.lookup k m of
     Nothing -> error "Data.HashMap.Internal.(!): key not found"
-    Just v -> v
+    Just v  -> v
 
 infixl 9 !
 
-toList :: H.HashMap k v -> [(k, v)]
-toList (HB.HashMap _ _ _ size v) = concatMap (\case
-    Just (Just (k, v)) -> [(k, v)]
-    _ -> []) (V.toList v)
+member :: (HC.DoubleHashable k) => k -> HB.HashMap k v -> Bool
+member k m = case HB.lookup k m of
+    Nothing -> False
+    Just _  -> True
 
-toAscList :: (Ord k) =>  H.HashMap k v -> [(k, v)]
+map :: (v -> v') -> HB.HashMap k v -> HB.HashMap k v'
+map f h@(HB.HashMap _ _ _ size v) = defH h size (V.map (fmap (fmap (second f))) v)
+
+union :: (HC.DoubleHashable k) => HB.HashMap k v -> HB.HashMap k v -> HB.HashMap k v
+union = unionWith const
+
+unionWith :: (HC.DoubleHashable k) => (v -> v -> v) -> HB.HashMap k v -> HB.HashMap k v -> HB.HashMap k v
+unionWith f = unionWithKey (const f)
+
+unionWithKey :: (HC.DoubleHashable k) => (k -> v -> v -> v) -> HB.HashMap k v -> HB.HashMap k v -> HB.HashMap k v
+unionWithKey f h1@(HB.HashMap _ _ _ size1 v1) h2@(HB.HashMap _ _ _ size2 v2) =
+    if size1 < size2
+      then unionWithKey f h2 h1
+      else foldr (\case
+              Just (Just (k, v)) -> HB.insertWith (f k) k v
+              _ -> id) h1 v2
+
+difference :: HC.DoubleHashable k => HB.HashMap k v -> HB.HashMap k v -> HB.HashMap k v
+difference = foldrWithKey (\k v h -> HB.delete k h)
+
+intersectionWithKey :: HC.DoubleHashable k => (k -> a -> b -> c) -> HB.HashMap k a -> HB.HashMap k b -> HB.HashMap k c
+intersectionWithKey f h1 h2 =  if HB.size h1 > HB.size h2 then intersectionWithKey (\k b' a' -> f k a' b') h2 h1 else foldrWithKey (\k' a' h ->
+    case HB.lookup k' h2 of
+        Just b' -> HB.insert k' (f k' a' b') h
+        Nothing -> h) HB.null h1
+
+intersectionWith :: HC.DoubleHashable k => (a -> b -> c) -> HB.HashMap k a -> HB.HashMap k b -> HB.HashMap k c
+intersectionWith = intersectionWithKey . const
+
+intersection :: HC.DoubleHashable k => HB.HashMap k a -> HB.HashMap k b -> HB.HashMap k a
+intersection = intersectionWith const
+
+toList :: HB.HashMap k v -> [(k, v)]
+toList (HB.HashMap _ _ _ size v) = V.toList $ V.concatMap (\case
+    Just (Just (k, v)) -> V.singleton (k, v)
+    _ -> V.empty) v
+
+keys :: HB.HashMap k v -> [k]
+keys = Prelude.map fst . toList
+
+elems :: HB.HashMap k v -> [v]
+elems = Prelude.map snd . toList
+
+toAscList :: (Ord k) =>  HB.HashMap k v -> [(k, v)]
 toAscList  = sortBy (\(k1, _) (k2, _) -> compare k1 k2) . toList
 
-foldMapWithKey :: (Monoid m) => (k -> v -> m) -> H.HashMap k v -> m
+foldMapWithKey :: (Monoid m) => (k -> v -> m) -> HB.HashMap k v -> m
 foldMapWithKey f (HB.HashMap _ _ _ _ v) = V.foldMap (\case
     Just (Just (k, v)) -> f k v
     _ -> mempty) v
@@ -42,3 +86,9 @@ foldrWithKey :: (k -> v -> a -> a) -> a -> HB.HashMap k v -> a
 foldrWithKey f a (HB.HashMap _ _ _ _ v) = V.foldr (\case
     Just (Just (k, v)) -> f k v
     _ -> id) a v
+
+{-mapMaybeWithKey :: (k -> v -> Maybe u) -> HB.HashMap k v -> HB.HashMap k u
+mapMaybeWithKey f h@(HB.HashMap _ _ _ s v) = _
+    where
+        (newV, deleted) = foldrWithKey _ _ _ 
+        newSize = s - deleted-}
