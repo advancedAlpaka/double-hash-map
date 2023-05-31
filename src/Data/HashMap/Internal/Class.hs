@@ -17,10 +17,10 @@ import System.Random.Stateful (Uniform(uniformM), globalStdGen)
 salt = fromInteger $ unsafePerformIO getCPUTime
 
 class (Hashable a) => DoubleHashable a where
-    hash1 :: Int -> a -> Int
-    hash1 _ = hashWithSalt salt1
-    hash2 :: Int -> a -> Int
-    hash2 size v = (1 + hashWithSalt salt2 v) `mod` (size - 1)
+    hash1 :: a -> Int
+    hash1 = hashWithSalt salt1
+    hash2 :: a -> Int
+    hash2 v = 1 + 2 * hashWithSalt salt2 v
 
 instance DoubleHashable Int
 

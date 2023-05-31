@@ -32,7 +32,7 @@ member k m = case HB.lookup k m of
     Just _  -> True
 
 map :: (v -> v') -> HB.HashMap k v -> HB.HashMap k v'
-map f h@(HB.HashMap _ _ _ size v) = defH h size (fmap (fmap (fmap (second f))) v)
+map f h@(HB.HashMap size v) = defH h size (fmap (fmap (fmap (second f))) v)
 
 union :: (HC.DoubleHashable k) => HB.HashMap k v -> HB.HashMap k v -> HB.HashMap k v
 union = unionWith const
@@ -41,7 +41,7 @@ unionWith :: (HC.DoubleHashable k) => (v -> v -> v) -> HB.HashMap k v -> HB.Hash
 unionWith f = unionWithKey (const f)
 
 unionWithKey :: (HC.DoubleHashable k) => (k -> v -> v -> v) -> HB.HashMap k v -> HB.HashMap k v -> HB.HashMap k v
-unionWithKey f h1@(HB.HashMap _ _ _ size1 v1) h2@(HB.HashMap _ _ _ size2 v2) =
+unionWithKey f h1@(HB.HashMap size1 v1) h2@(HB.HashMap size2 v2) =
     if size1 < size2
       then unionWithKey f h2 h1
       else foldr (\case
@@ -64,7 +64,7 @@ intersection :: HC.DoubleHashable k => HB.HashMap k a -> HB.HashMap k b -> HB.Ha
 intersection = intersectionWith const
 
 toList :: HB.HashMap k v -> [(k, v)]
-toList (HB.HashMap _ _ _ size v) = concatMap (\case
+toList (HB.HashMap size v) = concatMap (\case
     Just (Just (k, v)) -> [(k, v)]
     _ -> []) v
 
@@ -78,12 +78,12 @@ toAscList :: (Ord k) =>  HB.HashMap k v -> [(k, v)]
 toAscList  = sortBy (\(k1, _) (k2, _) -> compare k1 k2) . toList
 
 foldMapWithKey :: (Monoid m) => (k -> v -> m) -> HB.HashMap k v -> m
-foldMapWithKey f (HB.HashMap _ _ _ _ v) = foldMap (\case
+foldMapWithKey f (HB.HashMap _ v) = foldMap (\case
     Just (Just (k, v)) -> f k v
     _ -> mempty) v
 
 foldrWithKey :: (k -> v -> a -> a) -> a -> HB.HashMap k v -> a
-foldrWithKey f a (HB.HashMap _ _ _ _ v) = foldr (\case
+foldrWithKey f a (HB.HashMap _ v) = foldr (\case
     Just (Just (k, v)) -> f k v
     _ -> id) a v
 

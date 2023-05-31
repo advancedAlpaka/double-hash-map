@@ -16,6 +16,7 @@ import Test.QuickCheck.Poly        (A, B, C)
 import Test.Tasty                  (TestTree, testGroup, defaultMain)
 import Test.Tasty.QuickCheck       (testProperty)
 import Util.Key
+import Data.HashMap.Internal.Debug (isValid)
 
 import           Data.HashMap (HashMap)
 import qualified Data.HashMap as HM
@@ -47,18 +48,12 @@ data SubHashPath = SubHashPath
     -- ^ The number of bits known.
   } deriving (Eq, Show)
 
-data Validity k = Valid
-  deriving (Eq, Show)
-
 
 sortByKey :: Ord k => [(k, v)] -> [(k, v)]
 sortByKey = List.sortBy (compare `on` fst)
 
 toOrdMap :: Ord k => HashMap k v -> M.Map k v
 toOrdMap = M.fromList . HM.toList
-
-isValid :: (Eq k, Hashable k, Show k) => HashMap k v -> Property
-isValid m = Valid === Valid
 
 -- The free magma is used to test that operations are applied in the
 -- same order.

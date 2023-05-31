@@ -17,9 +17,6 @@ import qualified Prelude
 import Prelude hiding (null)
 
 data HashMap k v =  HashMap {
-  lessPr :: [Int],
-  morePr :: [Int],
-  nextPr ::[Int],
   size :: Int,
   buckets :: {-# UNPACK #-} !(A.Array (Maybe (Maybe (k, v)))) }
 
@@ -43,10 +40,9 @@ primes =
           EQ -> x : union xs ys
           GT -> y : union (x : xs) ys
 
-def = HashMap [] [] primes
+def = HashMap
 
-defH (HashMap l g n _ _) = HashMap l g n
-
+defH (HashMap _ _) = HashMap
 -- Nothing - wasn't setted
 -- Just Nothing - was deleted
 -- Just (Just (k, v)) - was setted
@@ -55,7 +51,7 @@ maxLoadFactor :: Ratio Int
 maxLoadFactor = 3 % 4
 
 minLoadFactor :: Ratio Int
-minLoadFactor = 3 % 5
+minLoadFactor = 2 % 5
 
 key = fst . fromJust . fromJust
 
@@ -63,15 +59,15 @@ val = snd . fromJust . fromJust
 
 null :: HashMap k v
 nullArray :: A.Array (Maybe (Maybe (k, v)))
-null@(HashMap _ _ _ _ nullArray) = def 0 $ runST $ do
-  arr <- A.newArray 7 Nothing
-  A.freezeArray arr 0 7
+null@(HashMap _ nullArray) = def 0 $ runST $ do
+  arr <- A.newArray 8 Nothing
+  A.freezeArray arr 0 8
 
 singleton :: (DoubleHashable k) => k -> v -> HashMap k v
 singleton k v = def 1 $ runST $ do
-  arr <- A.newArray 7 Nothing
-  A.writeArray arr (hash k `mod` 7) (Just (Just (k, v)))
-  A.freezeArray arr 0 7
+  arr <- A.newArray 8 Nothing
+  A.writeArray arr (hash k `mod` 8) (Just (Just (k, v)))
+  A.freezeArray arr 0 8
 
 empty :: HashMap k v -> Bool
 empty = (== 0) . size
@@ -79,34 +75,25 @@ empty = (== 0) . size
 data Rezize = ToHigh | ToLow
 
 resize :: (DoubleHashable k) => Rezize -> HashMap k v -> HashMap k v
-resize ToLow m@(HashMap lePr grPr nxtPr size v) =
-  if Prelude.null lePr
-    then m
-    else
+resize ToLow m@(HashMap size v) =
   foldl (\m p -> case p of
             (Just (Just (k, v))) -> unsafeInsert k v m
             _                    -> m
-        ) ( case lePr of
-                  []       -> undefined
-                  (x : xs) -> HashMap xs (A.sizeofArray v : grPr) nxtPr 0 $ runST $ do
-                    arr <- A.newArray x Nothing
-                    A.freezeArray arr 0 x
+        ) (HashMap 0 $ runST $ do
+                    let newCap = A.sizeofArray v `div` 2
+                    arr <- A.newArray newCap Nothing
+                    A.freezeArray arr 0 newCap
               )
          v
-resize ToHigh m@(HashMap lePr grPr nxtPr size v) =
+resize ToHigh m@(HashMap size v) =
       foldl
         ( \m p -> case p of
             (Just (Just (k, v))) -> unsafeInsert k v m
             _                    -> m
-        ) (case grPr of
-                  [] ->
-                    let (newCap, newPr) = findCap nxtPr
-                     in HashMap (A.sizeofArray v : lePr) grPr newPr 0 $ runST $ do
+        ) (HashMap 0 $ runST $ do
+                        let newCap = 2 * A.sizeofArray v
                         arr <- A.newArray newCap Nothing
                         A.freezeArray arr 0 newCap
-                  (x : xs) -> HashMap (A.sizeofArray v : lePr) xs nxtPr 0 $ runST $ do
-                    arr <- A.newArray x Nothing
-                    A.freezeArray arr 0 x
               ) v
  where
   findCap :: [Int] -> (Int, [Int])
@@ -117,11 +104,11 @@ resize ToHigh m@(HashMap lePr grPr nxtPr size v) =
 metaInsert :: (HasCallStack, DoubleHashable k) =>
   (HashMap k v -> Maybe (Either Int Int) -> (k, v) -> HashMap k v)
   -> k -> v -> HashMap k v -> HashMap k v
-metaInsert f k v m@(HashMap _ _ _ size v') = f m ind (k, v)
+metaInsert f k v m@(HashMap size v') = f m ind (k, v)
  where
   len = A.sizeofArray v'
-  h1 = hash1 len k `mod` len
-  h2 = hash2 len k `mod` len
+  h1 = hash1 k `mod` len
+  h2 = hash2 k `mod` len
   ind :: Maybe (Either Int Int)
   ind
     | isNothing p = Just $ Left h1 -- wasn't setted
@@ -146,7 +133,7 @@ insertHelper v ind kv = runST $ do
       v' <- A.unsafeThawArray v
       vNull <- A.unsafeThawArray nullArray
       v <- if A.sameMutableArray v' vNull then
-         A.cloneMutableArray vNull 0 7
+         A.cloneMutableArray vNull 0 8
         else return v'
       A.writeArray v ind $ Just $ Just kv
       A.unsafeFreezeArray v
@@ -158,10 +145,10 @@ unsafeInsert = unsafeInsertWith const
 unsafeInsertWith :: (DoubleHashable k) => (v -> v -> v) -> k -> v -> HashMap k v -> HashMap k v
 unsafeInsertWith f =
   metaInsert
-    ( \m@(HashMap _ _ _ size v') ind kv@(k, v) ->
+    ( \m@(HashMap size v') ind kv@(k, v) ->
         let oldCap = A.sizeofArray v'
          in case ind of
-              Nothing -> error $ "unsafeSet: Nothing \n oldCap : " ++ show oldCap ++ "\n size : " ++ show size ++ "\n hash1 k : " ++ show (hash1 oldCap k `mod` oldCap) ++ "\n hash2 k : " ++ show (hash2 oldCap k `mod` oldCap)
+              Nothing -> error $ "unsafeSet: Nothing \n oldCap : " ++ show oldCap ++ "\n size : " ++ show size ++ "\n hash1 k : " ++ show (hash1 k `mod` oldCap) ++ "\n hash2 k : " ++ show (hash2 k `mod` oldCap)
               Just (Left ind') -> defH m (size + 1) $ insertHelper v' ind' kv
               Just (Right ind') -> defH m size $ insertHelper v' ind' (k, f v (val $ A.indexArray v' ind'))
     )
@@ -173,7 +160,7 @@ insert = insertWith const
 insertWith :: (DoubleHashable k) => (v -> v -> v) -> k -> v -> HashMap k v -> HashMap k v
 insertWith f =
   metaInsert
-    ( \m@(HashMap _ _ _ size v') ind kv@(k, v) ->
+    ( \m@(HashMap size v') ind kv@(k, v) ->
         let oldCap = A.sizeofArray v'
          in case ind of
               Nothing -> insert k v $ resize ToHigh m
@@ -185,15 +172,15 @@ insertWith f =
 
 
 lookup :: (DoubleHashable k) => k -> HashMap k v -> Maybe v
-lookup k (HashMap _ _ _ _ v) =
+lookup k (HashMap _ v) =
   case A.indexArray v h1 of
     Nothing              -> Nothing -- wasn't setted
     Just Nothing         -> helper ((h1 + h2) `mod` len)
     Just (Just (k', v')) -> if k == k' then Just v' else helper ((h1 + h2) `mod` len)
  where
   len = A.sizeofArray v
-  h1 = hash1 len k `mod` len
-  h2 = hash2 len k `mod` len
+  h1 = hash1 k `mod` len
+  h2 = hash2 k `mod` len
   helper ind =
     if ind == h1
       then Nothing
@@ -218,11 +205,11 @@ fromList ((k,v) : l) = foldl' (\m (k, v) -> insert k v m) (singleton k v) l
 -}
 
 metaDelete :: (DoubleHashable k) => (HashMap k v -> Maybe Int -> k -> r) -> k -> HashMap k v -> r
-metaDelete f k m@(HashMap _ _ _ size v') = f m ind k
+metaDelete f k m@(HashMap size v') = f m ind k
  where
   len = A.sizeofArray v'
-  h1 = hash1 len k `mod` len
-  h2 = hash2 len k `mod` len
+  h1 = hash1 k `mod` len
+  h2 = hash2 k `mod` len
   ind :: Maybe Int
   ind
     | isNothing p = Nothing -- wasn't setted
@@ -242,7 +229,7 @@ metaDelete f k m@(HashMap _ _ _ size v') = f m ind k
     p = A.indexArray v' curInd
 
 delete :: (DoubleHashable k) => k -> HashMap k v -> HashMap k v
-delete = metaDelete $ \m@(HashMap _ _ _ size v') ind k ->
+delete = metaDelete $ \m@(HashMap size v') ind k ->
   let oldCap = A.sizeofArray v' in
    case ind of
         Nothing -> m
@@ -254,7 +241,7 @@ delete = metaDelete $ \m@(HashMap _ _ _ size v') ind k ->
            in if (size - 1) % 1 <= (oldCap % 1) * minLoadFactor then resize ToLow map else map
 
 unsafeDelete :: (DoubleHashable k) => k -> HashMap k v -> HashMap k v
-unsafeDelete = metaDelete $ \m@(HashMap _ _ _ size v') ind k ->
+unsafeDelete = metaDelete $ \m@(HashMap size v') ind k ->
   let oldCap = A.sizeofArray v' in
    case ind of
         Nothing -> m

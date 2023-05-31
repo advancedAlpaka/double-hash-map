@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NumericUnderscores #-}
 module Main(main) where
 
 import qualified Data.Aeson.Key as K
@@ -26,7 +27,7 @@ type K = V.Vector A.Key
 numbers :: IO (V, V, V)
 numbers = do
   gen <- createSystemRandom
-  random <- uniformVector gen 4000
+  random <- uniformVector gen 1_000_000
   let sorted    = G.modify I.sort random
       revsorted = G.reverse sorted
   return (random, sorted, revsorted)
@@ -34,7 +35,7 @@ numbers = do
 strings :: IO (B, B, B)
 strings = do
   gen <- createSystemRandom
-  random <- V.replicateM 100 $
+  random <- V.replicateM 500_000 $
       (pack . U.toList) `fmap` (uniformVector gen =<< uniformR (1,16) gen)
   let sorted    = G.modify I.sort random
       revsorted = G.reverse sorted
@@ -43,14 +44,14 @@ strings = do
 keys :: IO (K, K, K)
 keys = do
   gen <- createSystemRandom
-  random <- V.replicateM 100 $
+  random <- V.replicateM 1_000_000_00 $
       (K.fromString . U.toList) `fmap` (uniformVector gen =<< uniformR (1,16) gen)
   let sorted    = G.modify I.sort random
       revsorted = G.reverse sorted
   return (random, sorted, revsorted)
 
 value :: Int
-value = 31337
+value = 31_337
 
 hashmap :: (G.Vector v k, H.DoubleHashable k) => v k -> H.HashMap k Int
 hashmap = G.foldl' (\m k -> H.insert k value m) H.null
@@ -76,7 +77,7 @@ instance DoubleHashable A.Key
 
 main :: IO ()
 main =  defaultMain [
-          env numbers $ \ ~(random,sorted,revsorted) ->
+{-          env numbers $ \ ~(random,sorted,revsorted) ->
           bgroup "Int" [
             bgroup "IntMap" [
              bench "sorted"    $ whnf intmap sorted
@@ -104,7 +105,7 @@ main =  defaultMain [
            , bench "revsorted" $ whnf oldstricthashmap revsorted
            ]
          ]
-       {-, env strings $ \ ~(random,sorted,revsorted) ->
+       , env strings $ \ ~(random,sorted,revsorted) ->
          bgroup "ByteString" [
            bgroup "Map" [
              bench "sorted"    $ whnf mmap sorted
@@ -127,7 +128,7 @@ main =  defaultMain [
            , bench "revsorted" $ whnf oldstricthashmap revsorted
            ]
          ]
-        , env keys $ \ ~(random,sorted,revsorted) ->
+        ,-} env keys $ \ ~(random,sorted,revsorted) ->
           bgroup "Key" [
             bgroup "KeyMap" [
              bench "sorted"    $ whnf keymap sorted
@@ -139,5 +140,5 @@ main =  defaultMain [
            , bench "random"    $ whnf hashmap random
            , bench "revsorted" $ whnf hashmap revsorted
            ]
-       ]-}
+       ]
       ]

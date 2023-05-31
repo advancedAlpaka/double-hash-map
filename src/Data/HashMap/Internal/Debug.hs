@@ -1,8 +1,16 @@
 module Data.HashMap.Internal.Debug where
 import Data.HashMap.Internal.Base (HashMap (..))
 import Data.List (intercalate)
+import Data.Hashable (Hashable)
+import Test.QuickCheck (Property, (===))
 
 showDebug :: (Show k, Show v) => HashMap k v -> String
-showDebug (HashMap v1 v2 v3 s cur) = intercalate "\n" [
-    show v1, show v2, show $ take 3 v3, show s, show cur
+showDebug (HashMap s cur) = intercalate "\n" [
+    show s, show cur
   ]
+
+data Validity k = Valid
+  deriving (Eq, Show)
+
+isValid :: (Eq k, Hashable k, Show k) => HashMap k v -> Property
+isValid m = Valid === Valid

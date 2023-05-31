@@ -29,13 +29,13 @@ instance (Read k, Read e, DoubleHashable k) => Read (HashMap k e) where
 fun f = \case
           Just (Just (_, v)) -> f v
           _ -> id
-vec (HashMap _ _ _ _ v) = v
+
 
 instance Foldable (HashMap k) where
   foldr :: (a -> b -> b) -> b -> HashMap k a -> b
-  foldr f z = foldr (fun f) z . vec
+  foldr f z = foldr (fun f) z . buckets
   foldr' :: (a -> b -> b) -> b -> HashMap k a -> b
-  foldr' f z = foldr' (fun f) z . vec
+  foldr' f z = foldr' (fun f) z . buckets
   foldl :: (b -> a -> b) -> b -> HashMap k a -> b
   foldl = foldr . flip
   foldl' :: (b -> a -> b) -> b -> HashMap k a -> b
@@ -54,7 +54,7 @@ instance (Eq k, Eq v) => Eq (HashMap k v) where
 
 instance (NFData k, NFData v) => NFData (HashMap k v) where
   rnf :: HashMap k v -> ()
-  rnf (HashMap _ _ _ size v) = rnf size `seq` rnf v
+  rnf (HashMap size v) = rnf size `seq` rnf v
 
 
 instance DoubleHashable k => Semigroup (HashMap k v) where
