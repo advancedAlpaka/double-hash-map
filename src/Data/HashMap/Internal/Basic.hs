@@ -6,7 +6,7 @@ import qualified Data.HashMap.Internal.Base as HB
 import qualified Data.HashMap.Internal.Class as HC
 import Data.List (sortBy)
 import Data.Maybe (fromMaybe)
-import qualified Data.Vector as V
+import qualified Data.Primitive.Array as A
 import GHC.Stack (HasCallStack)
 import Data.HashMap.Internal.Base (defH)
 import Data.Bifunctor (second)
@@ -32,7 +32,7 @@ member k m = case HB.lookup k m of
     Just _  -> True
 
 map :: (v -> v') -> HB.HashMap k v -> HB.HashMap k v'
-map f h@(HB.HashMap _ _ _ size v) = defH h size (V.map (fmap (fmap (second f))) v)
+map f h@(HB.HashMap _ _ _ size v) = defH h size (fmap (fmap (fmap (second f))) v)
 
 union :: (HC.DoubleHashable k) => HB.HashMap k v -> HB.HashMap k v -> HB.HashMap k v
 union = unionWith const
@@ -52,9 +52,9 @@ difference :: HC.DoubleHashable k => HB.HashMap k v -> HB.HashMap k v -> HB.Hash
 difference = foldrWithKey (\k v h -> HB.delete k h)
 
 intersectionWithKey :: HC.DoubleHashable k => (k -> a -> b -> c) -> HB.HashMap k a -> HB.HashMap k b -> HB.HashMap k c
-intersectionWithKey f h1 h2 =  if HB.size h1 > HB.size h2 then intersectionWithKey (\k b' a' -> f k a' b') h2 h1 else foldrWithKey (\k' a' h ->
-    case HB.lookup k' h2 of
-        Just b' -> HB.insert k' (f k' a' b') h
+intersectionWithKey f h1 h2 =  if HB.size h1 > HB.size h2 then intersectionWithKey (\k b' a' -> f k a' b') h2 h1 else foldrWithKey (\k a h ->
+    case HB.lookup k h2 of
+        Just b' -> HB.insert k (f k a b') h
         Nothing -> h) HB.null h1
 
 intersectionWith :: HC.DoubleHashable k => (a -> b -> c) -> HB.HashMap k a -> HB.HashMap k b -> HB.HashMap k c
@@ -64,9 +64,9 @@ intersection :: HC.DoubleHashable k => HB.HashMap k a -> HB.HashMap k b -> HB.Ha
 intersection = intersectionWith const
 
 toList :: HB.HashMap k v -> [(k, v)]
-toList (HB.HashMap _ _ _ size v) = V.toList $ V.concatMap (\case
-    Just (Just (k, v)) -> V.singleton (k, v)
-    _ -> V.empty) v
+toList (HB.HashMap _ _ _ size v) = concatMap (\case
+    Just (Just (k, v)) -> [(k, v)]
+    _ -> []) v
 
 keys :: HB.HashMap k v -> [k]
 keys = Prelude.map fst . toList
@@ -78,12 +78,12 @@ toAscList :: (Ord k) =>  HB.HashMap k v -> [(k, v)]
 toAscList  = sortBy (\(k1, _) (k2, _) -> compare k1 k2) . toList
 
 foldMapWithKey :: (Monoid m) => (k -> v -> m) -> HB.HashMap k v -> m
-foldMapWithKey f (HB.HashMap _ _ _ _ v) = V.foldMap (\case
+foldMapWithKey f (HB.HashMap _ _ _ _ v) = foldMap (\case
     Just (Just (k, v)) -> f k v
     _ -> mempty) v
 
 foldrWithKey :: (k -> v -> a -> a) -> a -> HB.HashMap k v -> a
-foldrWithKey f a (HB.HashMap _ _ _ _ v) = V.foldr (\case
+foldrWithKey f a (HB.HashMap _ _ _ _ v) = foldr (\case
     Just (Just (k, v)) -> f k v
     _ -> id) a v
 

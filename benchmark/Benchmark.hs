@@ -15,6 +15,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Algorithms.Intro as I
 import qualified Data.Vector.Generic as G
 import qualified Data.Vector.Unboxed as U
+
 import System.Random.MWC
 import Test.Tasty.Bench (bench, bgroup, defaultMain, env, whnf)
 
@@ -25,7 +26,7 @@ type K = V.Vector A.Key
 numbers :: IO (V, V, V)
 numbers = do
   gen <- createSystemRandom
-  random <- uniformVector gen 4
+  random <- uniformVector gen 4000
   let sorted    = G.modify I.sort random
       revsorted = G.reverse sorted
   return (random, sorted, revsorted)
@@ -69,10 +70,9 @@ oldlazyhashmap = G.foldl' (\m k -> HL.insert k value m) HL.empty
 oldstricthashmap :: (G.Vector v k, HH.Hashable k) => v k -> HS.HashMap k Int
 oldstricthashmap = G.foldl' (\m k -> HS.insert k value m) HS.empty
 
+--instance DoubleHashable Int
 instance DoubleHashable ByteString
 instance DoubleHashable A.Key
-
-
 
 main :: IO ()
 main =  defaultMain [
@@ -104,7 +104,7 @@ main =  defaultMain [
            , bench "revsorted" $ whnf oldstricthashmap revsorted
            ]
          ]
-       , env strings $ \ ~(random,sorted,revsorted) ->
+       {-, env strings $ \ ~(random,sorted,revsorted) ->
          bgroup "ByteString" [
            bgroup "Map" [
              bench "sorted"    $ whnf mmap sorted
@@ -139,4 +139,5 @@ main =  defaultMain [
            , bench "random"    $ whnf hashmap random
            , bench "revsorted" $ whnf hashmap revsorted
            ]
-       ]]
+       ]-}
+      ]
