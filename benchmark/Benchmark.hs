@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE NumericUnderscores #-}
 module Main(main) where
 
@@ -27,7 +27,7 @@ type K = V.Vector A.Key
 numbers :: IO (V, V, V)
 numbers = do
   gen <- createSystemRandom
-  random <- uniformVector gen 1_000_000
+  random <- uniformVector gen 100_000
   let sorted    = G.modify I.sort random
       revsorted = G.reverse sorted
   return (random, sorted, revsorted)
@@ -44,7 +44,7 @@ strings = do
 keys :: IO (K, K, K)
 keys = do
   gen <- createSystemRandom
-  random <- V.replicateM 1_000_000_00 $
+  random <- V.replicateM 10_000 $
       (K.fromString . U.toList) `fmap` (uniformVector gen =<< uniformR (1,16) gen)
   let sorted    = G.modify I.sort random
       revsorted = G.reverse sorted
@@ -59,17 +59,11 @@ hashmap = G.foldl' (\m k -> H.insert k value m) H.null
 keymap :: (G.Vector v A.Key) => v A.Key -> A.KeyMap Int
 keymap = G.foldl' (\m k -> A.insert k value m) A.empty
 
-intmap :: G.Vector v Int => v Int -> IM.IntMap Int
-intmap = G.foldl' (\ m k -> IM.insert k value m) IM.empty
-
 mmap :: (G.Vector v k, Ord k) => v k -> M.Map k Int
 mmap = G.foldl' (\ m k -> M.insert k value m) M.empty
 
 oldlazyhashmap :: (G.Vector v k, HH.Hashable k) => v k -> HL.HashMap k Int
 oldlazyhashmap = G.foldl' (\m k -> HL.insert k value m) HL.empty
-
-oldstricthashmap :: (G.Vector v k, HH.Hashable k) => v k -> HS.HashMap k Int
-oldstricthashmap = G.foldl' (\m k -> HS.insert k value m) HS.empty
 
 --instance DoubleHashable Int
 instance DoubleHashable ByteString
@@ -77,58 +71,7 @@ instance DoubleHashable A.Key
 
 main :: IO ()
 main =  defaultMain [
-{-          env numbers $ \ ~(random,sorted,revsorted) ->
-          bgroup "Int" [
-            bgroup "IntMap" [
-             bench "sorted"    $ whnf intmap sorted
-           , bench "random"    $ whnf intmap random
-           , bench "revsorted" $ whnf intmap revsorted
-           ]
-        , bgroup "Map" [
-             bench "sorted"    $ whnf mmap sorted
-           , bench "random"    $ whnf mmap random
-           , bench "revsorted" $ whnf mmap revsorted
-           ]
-        , bgroup "HashMap" [
-             bench "sorted"    $ whnf hashmap sorted
-           , bench "random"    $ whnf hashmap random
-           , bench "revsorted" $ whnf hashmap revsorted
-           ]
-        , bgroup "HashMapLazy" [
-             bench "sorted"    $ whnf oldlazyhashmap sorted
-           , bench "random"    $ whnf oldlazyhashmap random
-           , bench "revsorted" $ whnf oldlazyhashmap revsorted
-           ]
-        , bgroup "HashMapStrict" [
-             bench "sorted"    $ whnf oldstricthashmap sorted
-           , bench "random"    $ whnf oldstricthashmap random
-           , bench "revsorted" $ whnf oldstricthashmap revsorted
-           ]
-         ]
-       , env strings $ \ ~(random,sorted,revsorted) ->
-         bgroup "ByteString" [
-           bgroup "Map" [
-             bench "sorted"    $ whnf mmap sorted
-           , bench "random"    $ whnf mmap random
-           , bench "revsorted" $ whnf mmap revsorted
-           ]
-         , bgroup "HashMap" [
-             bench "sorted"    $ whnf hashmap sorted
-           , bench "random"    $ whnf hashmap random
-           , bench "revsorted" $ whnf hashmap revsorted
-           ]
-        , bgroup "HashMapLazy" [
-             bench "sorted"    $ whnf oldlazyhashmap sorted
-           , bench "random"    $ whnf oldlazyhashmap random
-           , bench "revsorted" $ whnf oldlazyhashmap revsorted
-           ]
-        , bgroup "HashMapStrict" [
-             bench "sorted"    $ whnf oldstricthashmap sorted
-           , bench "random"    $ whnf oldstricthashmap random
-           , bench "revsorted" $ whnf oldstricthashmap revsorted
-           ]
-         ]
-        ,-} env keys $ \ ~(random,sorted,revsorted) ->
+        env keys $ \ ~(random,sorted,revsorted) ->
           bgroup "Key" [
             bgroup "KeyMap" [
              bench "sorted"    $ whnf keymap sorted
@@ -140,5 +83,10 @@ main =  defaultMain [
            , bench "random"    $ whnf hashmap random
            , bench "revsorted" $ whnf hashmap revsorted
            ]
-       ]
+        , bgroup "HashMapLazy" [
+             bench "sorted"    $ whnf oldlazyhashmap sorted
+           , bench "random"    $ whnf oldlazyhashmap random
+           , bench "revsorted" $ whnf oldlazyhashmap revsorted
+           ]
+        ]
       ]

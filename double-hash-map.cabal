@@ -26,6 +26,7 @@ library
         
     -- Modules included in this library but not exported.
     other-modules:
+        Data.HashMap.Internal.Array,
         Data.HashMap.Internal.Base,
         Data.HashMap.Internal.Basic,
         Data.HashMap.Internal.Class,
@@ -39,7 +40,6 @@ library
         primitive,
         deepseq,
         random,
-        QuickCheck,
         
     hs-source-dirs:   src
     default-language: Haskell2010

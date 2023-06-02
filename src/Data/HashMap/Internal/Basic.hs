@@ -8,7 +8,6 @@ import Data.List (sortBy)
 import Data.Maybe (fromMaybe)
 import qualified Data.Primitive.Array as A
 import GHC.Stack (HasCallStack)
-import Data.HashMap.Internal.Base (defH)
 import Data.Bifunctor (second)
 
 (!?) :: (HC.DoubleHashable k) => HB.HashMap k v -> k -> Maybe v
@@ -32,7 +31,7 @@ member k m = case HB.lookup k m of
     Just _  -> True
 
 map :: (v -> v') -> HB.HashMap k v -> HB.HashMap k v'
-map f h@(HB.HashMap size v) = defH h size (fmap (fmap (fmap (second f))) v)
+map f h@(HB.HashMap size v) = HB.HashMap size (fmap (fmap (fmap (second f))) v)
 
 union :: (HC.DoubleHashable k) => HB.HashMap k v -> HB.HashMap k v -> HB.HashMap k v
 union = unionWith const

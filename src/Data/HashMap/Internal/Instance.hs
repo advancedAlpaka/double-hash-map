@@ -5,7 +5,7 @@ module Data.HashMap.Internal.Instance where
 
 import Control.DeepSeq (NFData (..))
 import Data.Bifunctor (Bifunctor (..))
-import Data.HashMap.Internal.Base (HashMap (..), defH, insert, size, fromList)
+import Data.HashMap.Internal.Base (HashMap (..), insert, size, fromList)
 import Data.HashMap.Internal.Basic (union, map, foldrWithKey, toList)
 import qualified Data.HashMap.Internal.Base as HB (null)
 import Data.HashMap.Internal.Class (DoubleHashable)
@@ -29,7 +29,10 @@ instance (Read k, Read e, DoubleHashable k) => Read (HashMap k e) where
 fun f = \case
           Just (Just (_, v)) -> f v
           _ -> id
-
+fun1 :: (b -> a -> b) -> b -> Maybe (Maybe (k, a)) -> b
+fun1 f b = \case
+          Just (Just (_, v)) ->  f b v
+          _ -> b
 
 instance Foldable (HashMap k) where
   foldr :: (a -> b -> b) -> b -> HashMap k a -> b
@@ -37,9 +40,9 @@ instance Foldable (HashMap k) where
   foldr' :: (a -> b -> b) -> b -> HashMap k a -> b
   foldr' f z = foldr' (fun f) z . buckets
   foldl :: (b -> a -> b) -> b -> HashMap k a -> b
-  foldl = foldr . flip
+  foldl f z = foldl (fun1 f) z . buckets
   foldl' :: (b -> a -> b) -> b -> HashMap k a -> b
-  foldl' = foldr . flip
+  foldl' f z = foldl' (fun1 f) z . buckets
 
 
 instance Functor (HashMap k) where

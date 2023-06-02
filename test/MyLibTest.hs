@@ -16,7 +16,6 @@ import Test.QuickCheck.Poly        (A, B, C)
 import Test.Tasty                  (TestTree, testGroup, defaultMain)
 import Test.Tasty.QuickCheck       (testProperty)
 import Util.Key
-import Data.HashMap.Internal.Debug (isValid)
 
 import           Data.HashMap (HashMap)
 import qualified Data.HashMap as HM
@@ -25,6 +24,7 @@ import qualified Data.Map.Lazy     as M
 import qualified Data.Foldable   as Foldable
 import qualified Data.List       as List
 import qualified Test.QuickCheck as QC
+import Data.HashMap.Internal.Debug (Validity(Valid))
 
 instance (Hashable k) => (HM.DoubleHashable k)
 
@@ -38,33 +38,13 @@ instance (Eq k, Hashable k, Arbitrary k, Arbitrary v) => Arbitrary (HashMap k v)
 type HMK  = HashMap Key
 type HMKI = HMK Int
 
-data Error k
-  = INV1_internal_Empty
-data SubHashPath = SubHashPath
-  { partialHash :: !Word
-    -- ^ The bits we already know, starting from the lower bits.
-    -- The unknown upper bits are @0@.
-  , lengthInBits :: !Int
-    -- ^ The number of bits known.
-  } deriving (Eq, Show)
+isValid :: (Eq k, Hashable k, Show k) => HashMap k v -> Property
+isValid m = Valid === Valid
 
-
-sortByKey :: Ord k => [(k, v)] -> [(k, v)]
 sortByKey = List.sortBy (compare `on` fst)
 
 toOrdMap :: Ord k => HashMap k v -> M.Map k v
 toOrdMap = M.fromList . HM.toList
-
--- The free magma is used to test that operations are applied in the
--- same order.
-data Magma a
-  = Leaf a
-  | Op (Magma a) (Magma a)
-  deriving (Show, Eq, Ord)
-
-instance Hashable a => Hashable (Magma a) where
-  hashWithSalt s (Leaf a) = hashWithSalt s (hashWithSalt (1::Int) a)
-  hashWithSalt s (Op m n) = hashWithSalt s (hashWithSalt (hashWithSalt (2::Int) m) n)
 
 main :: IO ()
 main = defaultMain tests

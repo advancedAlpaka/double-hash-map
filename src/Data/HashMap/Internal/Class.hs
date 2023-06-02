@@ -23,5 +23,5 @@ class (Hashable a) => DoubleHashable a where
     hash2 v = 1 + 2 * hashWithSalt salt2 v
 
 instance DoubleHashable Int
-
+instance DoubleHashable String
 --instance (Hashable a) => DoubleHashable a
