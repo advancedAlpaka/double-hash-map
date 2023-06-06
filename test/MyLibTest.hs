@@ -24,11 +24,10 @@ import qualified Data.Map.Lazy     as M
 import qualified Data.Foldable   as Foldable
 import qualified Data.List       as List
 import qualified Test.QuickCheck as QC
-import Data.HashMap.Internal.Debug (Validity(Valid))
+import Data.HashMap.Internal.Debug (Validity(Valid), valid)
 
-instance (Hashable k) => (HM.DoubleHashable k)
 
-instance (Eq k, Hashable k, Arbitrary k, Arbitrary v) => Arbitrary (HashMap k v) where
+instance (Eq k, Arbitrary k, Arbitrary v, HM.DoubleHashable k) => Arbitrary (HashMap k v) where
   arbitrary = HM.fromList <$> arbitrary
   shrink = fmap HM.fromList . shrink . HM.toList
 
@@ -39,7 +38,7 @@ type HMK  = HashMap Key
 type HMKI = HMK Int
 
 isValid :: (Eq k, Hashable k, Show k) => HashMap k v -> Property
-isValid m = Valid === Valid
+isValid m = valid m === Valid
 
 sortByKey = List.sortBy (compare `on` fst)
 
@@ -98,7 +97,7 @@ tests =
         \(x :: HMKI) ->
           let f = List.sort . Foldable.foldr (:) []
           in  f x === f (toOrdMap x)
-      {-, testProperty "Hashable" $
+{-      , testProperty "Hashable" $
         \(xs :: [(Key, Int)]) is salt ->
           let xs' = List.nubBy (\(k,_) (k',_) -> k == k') xs
               -- Shuffle the list using indexes in the second
@@ -152,7 +151,7 @@ tests =
       , testProperty "valid" $
         \(k :: Key) (x :: HMKI) -> isValid (HM.delete k x)
       ]
-{-    , testGroup "alterF"
+    , testGroup "alterF"
       [ testGroup "model"
         [ -- We choose the list functor here because we don't fuss with
           -- it in alterF rules and because it has a sufficiently interesting
@@ -185,7 +184,7 @@ tests =
         \(Fn f :: Fun (Maybe A) [Maybe A]) k (x :: HMK A) ->
           let ys = HM.alterF f k x
           in  map valid ys === (Valid <$ ys)
-      ] -}
+      ] 
     -- Combine
     , testGroup "union"
       [ testProperty "model" $
@@ -249,7 +248,7 @@ tests =
       , testProperty "valid" $
         \(Fn f :: Fun A B) (m :: HMK A) -> isValid (HM.map f m)
       ]
-    {-, testGroup "traverseWithKey"
+{-    , testGroup "traverseWithKey"
       [ testProperty "model" $ QC.mapSize (`div` 8) $
         \(x :: HMKI) ->
           let f k v = [keyToInt k + v + 1, keyToInt k + v + 2]
@@ -260,12 +259,6 @@ tests =
           let f k v = [keyToInt k + v + 1, keyToInt k + v + 2]
               ys = HM.traverseWithKey f x
           in  fmap valid ys === (Valid <$ ys)
-      ]
-    , testGroup "mapKeys"
-      [ testProperty "model" $
-        \(m :: HMKI) -> toOrdMap (HM.mapKeys incKey m) === M.mapKeys incKey (toOrdMap m)
-      , testProperty "valid" $
-        \(Fn f :: Fun Key Key) (m :: HMKI) -> isValid (HM.mapKeys f m)
       ]-}
     -- Folds
     , testProperty "foldr" $
@@ -287,7 +280,7 @@ tests =
         let f k v = [(k, v)]
         in  sortByKey (HM.foldMapWithKey f m) === sortByKey (M.foldMapWithKey f (toOrdMap m))
     -- Filter
-   {- , testGroup "filter"
+    , testGroup "filter"
       [ testProperty "model" $
         \(Fn p) (m :: HMKI) -> toOrdMap (HM.filter p m) === M.filter p (toOrdMap m)
       , testProperty "valid" $
@@ -326,15 +319,15 @@ tests =
       , testProperty "valid" $
         \(kvs :: [(Key, Int)]) -> isValid (HM.fromList kvs)
       ]
-    , testGroup "fromListWith"
+{-    , testGroup "fromListWith"
       [ testProperty "model" $
         \(kvs :: [(Key, Int)]) ->
           let kvsM = map (fmap Leaf) kvs
           in  toOrdMap (HM.fromListWith Op kvsM) === M.fromListWith Op kvsM
       , testProperty "valid" $
         \(Fn2 f) (kvs :: [(Key, A)]) -> isValid (HM.fromListWith f kvs)
-      ]
+      ]-}
     , testProperty "toList" $
-      \(m :: HMKI) -> List.sort (HM.toList m) === List.sort (M.toList (toOrdMap m))-}
+      \(m :: HMKI) -> List.sort (HM.toList m) === List.sort (M.toList (toOrdMap m))
     ]
   ]

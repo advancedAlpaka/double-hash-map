@@ -23,6 +23,7 @@ module Data.HashMap(
     , keys
 
       -- * Combine
+    , alterF
       -- ** Union
     , union
     , unionWith
@@ -30,6 +31,8 @@ module Data.HashMap(
 
       -- * Transformations
     , map
+    , mapMaybe
+    , mapMaybeWithKey
 --    , traverseWithKey
 --    , mapKeys
 --
@@ -50,16 +53,18 @@ module Data.HashMap(
     
       -- * Filter
     , filter
+    , filterWithKey
 
 
       -- ** Lists
     , toList
     , fromList
+    , fromListWith
 ) where
 
 import Data.HashMap.Internal.Class
 import Data.HashMap.Internal.Base
 import Data.HashMap.Internal.Instance
 import Data.HashMap.Internal.Basic
-import Prelude hiding (lookup, null, union, unionWithKey, map)
+import Prelude hiding (lookup, null, union, unionWithKey, map, filter)
 import Data.Foldable (foldl', foldr')
