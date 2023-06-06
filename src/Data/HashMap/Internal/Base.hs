@@ -75,11 +75,13 @@ singH k@(HC.Hashed _ h1 _) v = HashMap 1 $ SA $ runST $ do
   SA.freezeSmallArray arr 0 8
 {-# INLINABLE singH #-}
 
-
 empty :: HashMap k v -> Bool
 empty = (== 0) . size
 
-data Resize = ToHigh | ToLow | ToSize Int  deriving (Eq, Show)
+data Resize = 
+    ToHigh 
+  | ToLow 
+  | ToSize {-# UNPACK #-} !Int  deriving (Eq, Show)
 
 changeSize = 256 :: Int
 resizeHelper :: Resize -> Int -> Arr (Maybe (Maybe (k, v)))
@@ -111,7 +113,7 @@ resizeHelper (ToSize s) _ = if s > changeSize
 resize :: (DoubleHashable k) => Resize -> HashMap k v -> HashMap k v
 resize to m@(HashMap size v) =
   if to == ToLow && length v == 8 then m else
-  foldl' (\m p -> case p of
+  foldl (\m p -> case p of
             (Just (Just (k, v))) -> resizeUnsafeInsert k v m
             _                    -> m
         ) (HashMap 0 $ resizeHelper to $ length v) v
@@ -128,60 +130,35 @@ insertHelper (SA v) ind kv = SA $ runST $ do
       SA.unsafeFreezeSmallArray v'
 {-# INLINABLE insertHelper #-}
 
-resizeMetaInsert :: (Eq k, DoubleHashable k) => (HashMap k v -> Maybe (Either Int Int) -> (HC.Hashed k, v) -> HashMap k v) -> HC.Hashed k -> v -> HashMap k v -> HashMap k v
+resizeMetaInsert :: (Eq k, DoubleHashable k) => (HashMap k v -> Altered v -> (HC.Hashed k, v) -> HashMap k v) -> HC.Hashed k -> v -> HashMap k v -> HashMap k v
 resizeMetaInsert _ keyHashed v Null = singH keyHashed v
-resizeMetaInsert f keyHashed@(HC.Hashed k hash1' hash2') v m@(HashMap size v') = f m ind (keyHashed, v)
-  where
-  len = length v'
-  h1 = (len + (hash1' `mod` len)) `mod` len
-  h2 = (len + ((2 * hash2' + 1) `mod` len)) `mod` len
-  ind :: Maybe (Either Int Int)
-  ind = case p of
-    Nothing -> Just $ Left h1 -- wasn't setted
-    Just Nothing -> Just $ Left h1 -- was deleted
-    Just (Just (k', v'')) -> if keyHashed == k'
-      then Just $ Right h1 -- was setted
-      else helper ((h1 + h2) `mod` len)
-   where
-    p = indA v' h1
-  helper :: Int -> Maybe (Either Int Int)
-  helper curInd = if curInd == h1 
-    then Nothing
-    else case p of
-      Nothing -> Just $ Left curInd
-      Just Nothing -> Just $ Left curInd -- was deleted
-      Just (Just (k', v'')) -> if keyHashed == k'
-        then Just $ Right curInd
-        else helper ((curInd + h2) `mod` len)
-   where
-    p = indA v' curInd
-  {-# INLINE helper #-}
-{-# INLINABLE resizeMetaInsert #-}
+resizeMetaInsert f keyHashed@(HC.Hashed k hash1' hash2') v m@(HashMap size v') = f m (lookupInsertV keyHashed v') (keyHashed, v)
+{-# INLINE resizeMetaInsert #-}
 
 resizeInsertWith :: (DoubleHashable k) => (v -> v -> v) -> HC.Hashed k -> v -> HashMap k v -> HashMap k v
 resizeInsertWith f = resizeMetaInsert $ \m@(HashMap size v') ind kv@(k, v) ->
         let oldCap = length v'
          in case ind of
-              Nothing -> resize ToHigh $ resizeUnsafeInsert k v m
-              Just (Left ind') ->
+              ClusterEnd -> resize ToHigh $ resizeUnsafeInsert k v m
+              Insert ind' ->
                 if (size + 1) % oldCap >= maxLoadFactor
                   then resize ToHigh $ resizeUnsafeInsert k v m
                   else HashMap (size + 1) $ insertHelper v' ind' kv
-              Just (Right ind') -> HashMap size $ insertHelper v' ind' (k, f v (val $ indA v' ind'))
+              Update ind' oldV -> HashMap size $ insertHelper v' ind' (k, f v oldV)
 {-# INLINABLE resizeInsertWith #-}
 
 resizeUnsafeInsertWith :: (DoubleHashable k) => (v -> v -> v) -> HC.Hashed k -> v -> HashMap k v -> HashMap k v
 resizeUnsafeInsertWith f = resizeMetaInsert $ \m@(HashMap size v') ind kv@(k@(HC.Hashed _ h1 h2), v) ->
         let oldCap = length v'
          in case ind of
-              Nothing -> error $ show oldCap ++ " " ++ show size ++ " " ++ show h1 ++ " " ++ show h2
-              Just (Left ind') -> HashMap (size + 1) $ insertHelper v' ind' (k, v)
-              Just (Right ind') -> HashMap size $ insertHelper v' ind' (k, f v (val $ indA v' ind'))
+              ClusterEnd -> error $ show oldCap ++ " " ++ show size ++ " " ++ show h1 ++ " " ++ show h2
+              Insert ind' -> HashMap (size + 1) $ insertHelper v' ind' (k, v)
+              Update ind' oldV -> HashMap size $ insertHelper v' ind' (k, f v oldV)
 {-# INLINABLE resizeUnsafeInsertWith #-}
 
 resizeInsert :: (DoubleHashable k) => HC.Hashed k -> v -> HashMap k v -> HashMap k v
 resizeInsert = resizeInsertWith const
-{-# INLINABLE resizeInsert #-}
+{-# INLINE resizeInsert #-}
 
 resizeUnsafeInsert :: (DoubleHashable k) => HC.Hashed k -> v -> HashMap k v -> HashMap k v
 resizeUnsafeInsert = resizeUnsafeInsertWith const
@@ -189,11 +166,11 @@ resizeUnsafeInsert = resizeUnsafeInsertWith const
 
 unsafeInsert :: (HasCallStack, DoubleHashable k) => k -> v -> HashMap k v -> HashMap k v
 unsafeInsert = unsafeInsertWith const
-{-# INLINABLE unsafeInsert #-}
+{-# INLINE unsafeInsert #-}
 
 unsafeInsertWith :: (DoubleHashable k) => (v -> v -> v) -> k -> v -> HashMap k v -> HashMap k v
 unsafeInsertWith f = resizeUnsafeInsertWith f . HC.hashed
-{-# INLINABLE unsafeInsertWith #-}
+{-# INLINE unsafeInsertWith #-}
 
 insert :: (DoubleHashable k) => k -> v -> HashMap k v -> HashMap k v
 insert = insertWith const
@@ -203,39 +180,71 @@ insertWith :: (DoubleHashable k) => (v -> v -> v) -> k -> v -> HashMap k v -> Ha
 insertWith f = resizeInsertWith f . HC.hashed
 {-# INLINABLE insertWith #-}
 
+lookupInsertV :: (DoubleHashable k) => HC.Hashed k -> Arr (Maybe (Maybe (HC.Hashed k, v))) -> Altered v
+lookupInsertV keyHashed@(HC.Hashed _ hash1' hash2') v' = case indA v' h1 of
+    Nothing -> Insert h1
+    Just Nothing -> Insert h1 -- was deleted
+    Just (Just (k', v'')) -> if keyHashed == k'
+      then Update h1 v'' -- was setted
+      else helper ((h1 + h2) `mod` len)
+  where
+    len = length v'
+    h1 = (len + (hash1' `mod` len)) `mod` len
+    h2 = (len + ((2 * hash2' + 1) `mod` len)) `mod` len
+    helper curInd = if curInd == h1
+      then ClusterEnd
+      else case p of
+        Nothing -> Insert curInd
+        Just Nothing -> Insert curInd -- was deleted
+        Just (Just (k', v'')) -> if keyHashed == k'
+          then Update curInd v''
+          else helper ((curInd + h2) `mod` len)
+      where
+        p = indA v' curInd
+{-# INLINABLE lookupInsertV #-}
+
+lookupV' :: (DoubleHashable k) => HC.Hashed k -> Arr (Maybe (Maybe (HC.Hashed k, v))) -> Altered v
+lookupV' keyHashed@(HC.Hashed _ hash1' hash2') v' = case indA v' h1 of
+    Nothing -> ClusterEnd
+    Just Nothing -> helper ((h1 + h2) `mod` len) -- was deleted
+    Just (Just (k', v'')) -> if keyHashed == k'
+      then Update h1 v'' -- was setted
+      else helper ((h1 + h2) `mod` len)
+  where
+    len = length v'
+    h1 = (len + (hash1' `mod` len)) `mod` len
+    h2 = (len + ((2 * hash2' + 1) `mod` len)) `mod` len
+    helper curInd = if curInd == h1
+      then ClusterEnd
+      else case p of
+        Nothing -> ClusterEnd
+        Just Nothing -> helper ((curInd + h2) `mod` len) -- was deleted
+        Just (Just (k', v'')) -> if keyHashed == k'
+          then Update curInd v''
+          else helper ((curInd + h2) `mod` len)
+      where
+        p = indA v' curInd
+{-# INLINABLE lookupV' #-}
+
 lookup :: (DoubleHashable k) => k -> HashMap k v -> Maybe v
 lookup k Null = Nothing
-lookup k (HashMap _ v) =
-  case indA v h1 of
-    Nothing              -> Nothing -- wasn't setted
-    Just Nothing         -> helper ((h1 + h2) `mod` len)
-    Just (Just (k', v')) -> if keyHashed == k' then Just v' else helper ((h1 + h2) `mod` len)
- where
-  keyHashed@(HC.Hashed _ hash1' hash2') = HC.hashed k
-  h1 = (len + hash1' `mod` len) `mod` len
-  h2 = (len + hash2' `mod` len) `mod` len
-  len = length v
-  helper ind =
-    if ind == h1
-      then Nothing
-      else
-        case indA v ind of
-          Nothing -> Nothing -- wasn't setted
-          Just Nothing -> helper ((h1 + h2) `mod` len)
-          Just (Just (k', v'')) -> if keyHashed == k' 
-            then Just v'' 
-            else helper ((ind + h2) `mod` len)
-{-# INLINABLE lookup #-}
+lookup k (HashMap _ v) = case lookupV' (HC.hashed k) v of
+    Insert _ -> Nothing
+    Update _ v -> Just v
+    ClusterEnd -> Nothing
+{-# INLINE lookup #-}
 
 data Altered v =
-  Insert Int | Update Int v | ClusterEnd
+    Insert {-# UNPACK #-} !Int
+  | Update {-# UNPACK #-} !Int v
+  | ClusterEnd
 
 alterF :: (Functor f, DoubleHashable k) => (Maybe v -> f (Maybe v)) -> k -> HashMap k v -> f (HashMap k v)
 alterF f k Null = f Nothing <&> \case
     Nothing -> Null
     Just v -> singleton k v
 alterF f k m@(HashMap size v) = let oldCap = length v in
-  case ind of
+  case lookupInsertV keyHashed v of
     Insert ind -> f Nothing <&> \case
         Nothing -> m
         Just val' -> if (size + 1) % oldCap >= maxLoadFactor
@@ -251,25 +260,7 @@ alterF f k m@(HashMap size v) = let oldCap = length v in
         Nothing -> resize ToHigh m
         Just val' -> insert k val' $ resize ToHigh m
     where
-      keyHashed@(HC.Hashed _ hash1' hash2') = HC.hashed k
-      len = length v
-      h1 = (len + hash1' `mod` len) `mod` len
-      h2 = (len + hash2' `mod` len) `mod` len
-      ind
-        | isNothing p = Insert h1 -- wasn't setted
-        | isNothing (fromJust p) = Insert h1 -- was deleted
-        | fst (fromJust . fromJust $ p) == keyHashed = Update h1 $ snd (fromJust . fromJust $ p) -- was setted
-        | otherwise = helper ((h1 + h2) `mod` len)
-       where
-        p = indA v h1
-      helper curInd
-        | curInd == h1 = ClusterEnd
-        | isNothing p = Insert curInd
-        | isNothing (fromJust p) = Insert curInd -- was deleted
-        | fst (fromJust . fromJust $ p) == keyHashed = Update h1 $ snd (fromJust . fromJust $ p)
-        | otherwise = helper ((curInd + h2) `mod` len)
-       where
-        p = indA v curInd
+      keyHashed = HC.hashed k
 
 fromList :: (DoubleHashable k) => [(k, v)] -> HashMap k v
 fromList [] = null

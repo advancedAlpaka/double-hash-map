@@ -11,6 +11,7 @@ import qualified Data.Vector.Generic as G
 import Data.Hashable
 import Data.HashMap.Internal.Debug (showDebug)
 import Control.DeepSeq (NFData(rnf))
+import Data.Primitive.Array
 
 instance H.DoubleHashable K.Key where
   hash1WithSalt = hashWithSalt
@@ -30,4 +31,4 @@ main = do
   random <- V.replicateM 1_000_000 $
       (K.fromString . U.toList) `fmap` (uniformVector gen =<< uniformR (1,16) gen)
   let h = hashmap random
-  rnf h `seq` return ()
+  print h

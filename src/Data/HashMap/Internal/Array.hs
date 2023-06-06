@@ -36,6 +36,7 @@ instance Foldable Arr where
   foldl :: (b -> a -> b) -> b -> Arr a -> b
   foldl f z (A a) = foldl f z a
   foldl f z (SA a) = foldl f z a
+  {-# INLINE foldl #-}
   foldl' :: (b -> a -> b) -> b -> Arr a -> b
   foldl' f z (A a) = foldl' f z a
   foldl' f z (SA a) = foldl' f z a
@@ -53,8 +54,8 @@ instance Foldable Arr where
   null (A a) = null a
   null (SA a) = null a
   length :: Arr a -> Int
-  length (A a) = length a
-  length (SA a) = length a
+  length (A a) = A.sizeofArray a
+  length (SA a) = SA.sizeofSmallArray a
   {-# INLINE length #-}
 
 indA :: Arr v -> Int -> v
